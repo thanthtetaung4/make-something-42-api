@@ -74,6 +74,33 @@ app.post("/api/get_campus_data", (req, res) => {
     });
 });
 
+//API endpoint for project data
+app.post("/api/get_project_data", (req, res) => {
+  // console.log("req body", req.body);
+  const { accessToken } = req.body;
+  // console.log("accessToekn".accessToken);
+  if (!accessToken) {
+    return res.status(400).send("Access token is missing");
+  }
+
+  const apiUrl = "https://api.intra.42.fr/v2/cursus/21/projects?page[number]=5";
+
+  axios
+    .get(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    .then((response) => {
+      console.log("project data:", response.data);
+      res.json(response.data);
+    })
+    .catch((error) => {
+      console.error("Error fetching project data:", error);
+      res.status(500).send("Error fetching project data");
+    });
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
