@@ -48,60 +48,49 @@ app.post("/exchange_token", (req, res) => {
 });
 
 //API endpoint for campus data
-app.post("/api/get_campus_data", (req, res) => {
-  // console.log("req body", req.body);
+app.post("/api/get_campus_data", async (req, res) => {
   const { accessToken } = req.body;
-  // console.log("accessToekn".accessToken);
   if (!accessToken) {
     return res.status(400).send("Access token is missing");
   }
 
   const apiUrl = "https://api.intra.42.fr/v2/campus";
+  const allCampuses = [];
+  let page = 1;
+  const rateLimitDelay = 500; // 2 requests per second, so 500 ms delay
 
-  axios
-    .get(apiUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    })
-    .then((response) => {
-      console.log("Campus data:", response.data);
-      res.json(response.data);
-    })
-    .catch((error) => {
-      console.error("Error fetching campus data:", error);
-      res.status(500).send("Error fetching campus data");
-    });
+  try {
+    while (true) {
+      const response = await axios.get(`${apiUrl}?page[number]=${page}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const campuses = response.data;
+      console.log(campuses);
+      if (campuses.length === 0) {
+        break; // Exit loop if no more campuses are returned
+      }
+      allCampuses.push(...campuses);
+      page++;
+
+      if (campuses.length < 30) {
+        break; // If fewer than 30 projects are returned, this is the last page
+      }
+
+      // Wait before making the next request to respect the rate limit
+      await new Promise((resolve) => setTimeout(resolve, rateLimitDelay));
+    }
+
+    res.json(allCampuses);
+  } catch (error) {
+    console.error("Error fetching campus data:", error);
+    res.status(500).send("Error fetching campus data");
+  }
 });
 
 //API endpoint for project data
-// app.post("/api/get_project_data", (req, res) => {
-//   // console.log("req body", req.body);
-//   const { accessToken } = req.body;
-//   // console.log("accessToekn".accessToken);
-//   if (!accessToken) {
-//     return res.status(400).send("Access token is missing");
-//   }
-
-//   const apiUrl =
-//     "https://api.intra.42.fr/v2/cursus/21/projects?page[number]=50";
-
-//   axios
-//     .get(apiUrl, {
-//       headers: {
-//         Authorization: `Bearer ${accessToken}`,
-//       },
-//     })
-//     .then((response) => {
-//       console.log("project data:", response.data);
-//       res.json(response.data);
-//     })
-//     .catch((error) => {
-//       console.error("Error fetching project data:", error);
-//       res.status(500).send("Error fetching project data");
-//     });
-// });
-
 app.post("/api/get_project_data", async (req, res) => {
   const { accessToken } = req.body;
   if (!accessToken) {
@@ -122,7 +111,7 @@ app.post("/api/get_project_data", async (req, res) => {
       });
 
       const projects = response.data;
-
+      console.log(projects);
       if (projects.length === 0) {
         break; // Exit loop if no more projects are returned
       }
@@ -138,6 +127,55 @@ app.post("/api/get_project_data", async (req, res) => {
     }
 
     res.json(allProjects);
+  } catch (error) {
+    console.error("Error fetching project data:", error);
+    res.status(500).send("Error fetching project data");
+  }
+});
+
+//API endpoint for peerdata
+app.post("/api/get_peer_data", async (req, res) => {
+  const { accessToken, projectId, campusId } = req.body;
+  console.log("====================================");
+  console.log("projectid", projectId, "campusid", campusId);
+  console.log("====================================");
+  if (!accessToken) {
+    return res.status(400).send("Access token is missing");
+  }
+
+  const apiUrl = `https://api.intra.42.fr/v2/projects/${projectId}/projects_users`;
+  const allPeers = [];
+  let page = 1;
+  const rateLimitDelay = 500; // 2 requests per second, so 500 ms delay
+
+  try {
+    while (true) {
+      const response = await axios.get(
+        `${apiUrl}?page[number]=${page}&filter[campus]=${campusId}&filter[status]=in_progress`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const peers = response.data;
+      console.log(peers);
+      if (peers.length === 0) {
+        break; // Exit loop if no more peers are returned
+      }
+      allPeers.push(...peers);
+      page++;
+
+      if (peers.length < 30) {
+        break; // If fewer than 30 peers are returned, this is the last page
+      }
+
+      // Wait before making the next request to respect the rate limit
+      await new Promise((resolve) => setTimeout(resolve, rateLimitDelay));
+    }
+
+    res.json(allPeers);
   } catch (error) {
     console.error("Error fetching project data:", error);
     res.status(500).send("Error fetching project data");
